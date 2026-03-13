@@ -1,5 +1,5 @@
 ---
-description: Snake movement mechanics inside a cylindrical tunnel
+description: Snake movement mechanics on a flat grid arena
 alwaysApply: true
 ---
 
@@ -7,31 +7,55 @@ alwaysApply: true
 
 ## Движение
 
-Змейка движется по внутренней поверхности цилиндрического туннеля:
-- Только вперёд + вращение вокруг оси туннеля
-- Игрок управляет углом `angle`, `z` увеличивается автоматически
+Змейка движется по плоской прямоугольной арене (20×20 клеток):
+- Тиковая механика: один шаг в тик (интервал ~150 мс, уменьшается с ростом счёта)
+- Управление: только `←`/`→` — поворот влево/вправо **относительно текущего направления**
+- Змейка всегда движется вперёд, игрок только поворачивает
 
-## Цилиндрические координаты
+## Координаты
 
 ```ts
-x = radius * Math.cos(angle)
-y = radius * Math.sin(angle)
-z += speed * delta
+// Сетка 20×20, каждая клетка = 1 unit в 3D-пространстве
+type GridPos = { x: number; z: number }
+
+// Перевод в мировые координаты
+worldX = (gx - GRID_WIDTH / 2 + 0.5) * CELL_SIZE
+worldZ = (gz - GRID_HEIGHT / 2 + 0.5) * CELL_SIZE
 ```
 
 ## Сегменты тела
 
-Тело повторяет траекторию головы через `positionHistory`:
+Тело хранится как массив `GridPos[]`, голова — `body[0]`:
 
 ```ts
-// Голова пишет в историю каждый кадр
-positionHistory.unshift({ angle, z });
+// Тик: добавляем новую голову, убираем хвост (если нет роста)
+snakeRefs.prevBody = snakeRefs.body.map(p => ({ ...p }))
+snakeRefs.body.unshift(newHead)
+snakeRefs.body.pop()
 
-// Каждый сегмент берёт позицию из истории
-segment[i].position = positionHistory[i * SEGMENT_SPACING];
+// Рост: при поедании еды добавляем 3 сегмента у хвоста
+const tail = snakeRefs.body[snakeRefs.body.length - 1]
+for (let i = 0; i < 3; i++) snakeRefs.body.push({ ...tail })
 ```
+
+## Интерполяция
+
+Чтобы движение было плавным между тиками, каждый кадр вычисляется `tickProgress` (0→1):
+
+```ts
+snakeRefs.tickProgress = Math.min(accRef.current / interval, 1)
+
+// Визуальная позиция = lerp между prevBody и body
+worldX = lerp(gridToWorldX(prev.x), gridToWorldX(curr.x), tickProgress)
+```
+
+## Управление
+
+- `←` / `A` — поворот налево (CCW сверху): right→up→left→down→right
+- `→` / `D` — поворот направо (CW сверху): right→down→left→up→right
 
 ## Камера
 
-- Располагается позади головы
-- Слегка вращается вокруг оси туннеля вслед за `angle` головы
+- Располагается позади головы на расстоянии `BACK_DIST` по текущему направлению
+- Плавно поворачивается при смене направления (экспоненциальное сглаживание, frame-rate independent)
+- Позиция точно следует за интерполированной головой — без дополнительного lerp

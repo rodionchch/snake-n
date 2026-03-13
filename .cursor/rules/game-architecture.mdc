@@ -12,17 +12,37 @@ alwaysApply: true
 ```
 src/
   engine/       # игровой цикл, системы, input, collision
-  entities/     # сущности: Snake, Food, Tunnel
-  systems/      # логика движения, коллизий, spawn еды, камеры
+  entities/     # сущности: Snake, snakeState, Food, Arena
+  systems/      # логика коллизий, spawn еды, камеры
   components/   # рендер и UI: Canvas, HUD, GameOver
   store/        # Zustand состояние игры
-  utils/        # вспомогательные функции, math, random
+  utils/        # вспомогательные функции, math, constants
 ```
 
 ## Правила
 
-- **Entities** = игровые объекты (данные и состояние)
+- **Entities** = игровые объекты (данные и рендер)
 - **Systems** = логика обновления (чистые функции над entities)
+- `snakeState.ts` — мутабельные рефы змейки (`snakeRefs`), не React state
 - Rendering отдельно от логики — компоненты только читают состояние
 - Game updates выполняются в `useFrame()`
 - Не помещать игровую логику в React компоненты
+
+## Мутабельный стейт змейки (`snakeRefs`)
+
+```ts
+// snakeState.ts — живёт вне React, читается системами без re-render
+export const snakeRefs = {
+  body: GridPos[],       // массив клеток, body[0] = голова
+  prevBody: GridPos[],   // snapshot до последнего тика (для интерполяции)
+  tickProgress: number,  // 0→1 между тиками
+  direction: Direction,  // текущее направление движения
+}
+```
+
+## Zustand store
+
+Хранит только то, что нужно React-компонентам:
+- `status`: `'idle' | 'running' | 'game_over'`
+- `score`, `snake.length` — для HUD
+- `food` — позиция и активность еды

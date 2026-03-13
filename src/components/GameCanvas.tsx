@@ -30,7 +30,7 @@ export function GameCanvas() {
       <GameLoop />
       <CameraSystem />
       <EffectComposer>
-        <Bloom threshold={0.08} strength={0.7} radius={0.7} />
+        <Bloom threshold={0.05} strength={1.0} radius={0.8} />
       </EffectComposer>
     </Canvas>
   )

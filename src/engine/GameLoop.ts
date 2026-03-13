@@ -47,49 +47,45 @@ export function GameLoop(): null {
     accRef.current += delta
     const interval = getMoveInterval(score)
 
+    if (accRef.current >= interval) {
+      accRef.current -= interval
+
+      if (!food.active) {
+        setFood({ position: spawnFoodPosition(snakeRefs.body), active: true })
+      } else {
+        // Применяем накопленный поворот
+        const turn = inputState.turn
+        if (turn === 'left')  snakeRefs.direction = TURN_LEFT[snakeRefs.direction]
+        if (turn === 'right') snakeRefs.direction = TURN_RIGHT[snakeRefs.direction]
+        inputState.turn = null
+
+        const head = nextHead(snakeRefs.body, snakeRefs.direction)
+
+        if (checkWallCollision(head)) {
+          endGame()
+        } else {
+          snakeRefs.prevBody = snakeRefs.body.map(p => ({ ...p }))
+          snakeRefs.body.unshift(head)
+
+          if (checkSelfCollision(snakeRefs.body)) {
+            endGame()
+          } else {
+            if (hasEatenFood(head, food.position)) {
+              const tail = snakeRefs.body[snakeRefs.body.length - 1]
+              for (let i = 0; i < 3; i++) snakeRefs.body.push({ ...tail })
+              incrementScore(10)
+              growSnake(3)
+              setFood({ position: spawnFoodPosition(snakeRefs.body), active: true })
+            }
+            snakeRefs.body.pop()
+          }
+        }
+      }
+    }
+
+    // tickProgress обновляется ПОСЛЕ тика — остаток времени учитывается,
+    // нет резкого скачка к 0 между кадрами
     snakeRefs.tickProgress = Math.min(accRef.current / interval, 1)
-
-    if (accRef.current < interval) return
-    accRef.current -= interval
-    snakeRefs.tickProgress = 0
-
-    if (!food.active) {
-      setFood({ position: spawnFoodPosition(snakeRefs.body), active: true })
-      return
-    }
-
-    // Применяем накопленный поворот
-    const turn = inputState.turn
-    if (turn === 'left')  snakeRefs.direction = TURN_LEFT[snakeRefs.direction]
-    if (turn === 'right') snakeRefs.direction = TURN_RIGHT[snakeRefs.direction]
-    inputState.turn = null
-
-    const head = nextHead(snakeRefs.body, snakeRefs.direction)
-
-    if (checkWallCollision(head)) {
-      endGame()
-      return
-    }
-
-    snakeRefs.prevBody = snakeRefs.body.map(p => ({ ...p }))
-    snakeRefs.body.unshift(head)
-
-    if (checkSelfCollision(snakeRefs.body)) {
-      endGame()
-      return
-    }
-
-    if (hasEatenFood(head, food.position)) {
-      // Сразу добавляем 3 сегмента у хвоста — рост виден немедленно
-      const tail = snakeRefs.body[snakeRefs.body.length - 1]
-      for (let i = 0; i < 3; i++) snakeRefs.body.push({ ...tail })
-      incrementScore(10)
-      growSnake(3)
-      setFood({ position: spawnFoodPosition(snakeRefs.body), active: true })
-    }
-
-    // Убираем хвост (обычное движение вперёд)
-    snakeRefs.body.pop()
   })
 
   return null

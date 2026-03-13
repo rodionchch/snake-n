@@ -7,7 +7,8 @@ alwaysApply: true
 
 ## Рендеринг
 
-- Использовать `InstancedMesh` для сегментов змейки — один draw call на все сегменты
+- Использовать `InstancedMesh` для сегментов тела змейки — один draw call на все сегменты
+- `frustumCulled={false}` на `InstancedMesh` — Three.js не отсекает новые сегменты по bounding box
 - Трансформы объектов обновлять только внутри `useFrame`, не через state
 
 ```tsx
@@ -19,16 +20,34 @@ useFrame(() => setPos(newPos));
 const meshRef = useRef<InstancedMesh>(null);
 useFrame(() => {
   dummy.position.set(x, y, z);
+  dummy.scale.set(w, h, w);
   dummy.updateMatrix();
   meshRef.current!.setMatrixAt(i, dummy.matrix);
   meshRef.current!.instanceMatrix.needsUpdate = true;
 });
 ```
 
+## Интерполяция между тиками
+
+Позиции сегментов интерполируются между `prevBody` и `body` через `tickProgress`:
+
+```ts
+// ✅ Плавное движение без дополнительного React state
+const wx = lerp(gridToWorldX(prev.x), gridToWorldX(curr.x), tickProgress)
+```
+
+## Камера
+
+- Камера точно следует за интерполированной головой — без lerp на позиции
+- Только вектор направления сглаживается экспоненциально (frame-rate independent):
+  ```ts
+  const alpha = 1 - Math.exp(-DIR_SPEED * delta)
+  ```
+
 ## React State
 
 - Не хранить per-frame данные в React state
-- Refs — для 3D-объектов, позиций, истории движения
+- `snakeRefs` (в `snakeState.ts`) — для позиций змейки, направления, интерполяции
 - Zustand state — только для смены экранов, счёта, game over
 
 ## Цель

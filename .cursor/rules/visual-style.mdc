@@ -9,24 +9,33 @@ alwaysApply: true
 
 - Минимализм в духе Snake N-Gage (Nokia, начало 2000-х)
 - Аркадная эстетика — никакого фотореализма
-- Тёмный фон туннеля, яркие игровые объекты
+- Тёмная арена, яркие светящиеся игровые объекты
+- Вид от третьего лица позади змейки
 
 ## Материалы
 
 ```tsx
-// Змейка — яркий emissive цвет
+// Голова змейки — ярче тела
+<meshStandardMaterial color="#00ffaa" emissive="#00ffaa" emissiveIntensity={1.2} />
+
+// Тело змейки
 <meshStandardMaterial color="#00ff88" emissive="#00ff88" emissiveIntensity={0.8} />
 
-// Еда — светящийся объект
+// Еда — самый яркий объект
 <meshStandardMaterial color="#ff4400" emissive="#ff4400" emissiveIntensity={1.2} />
 
-// Туннель — тёмный, почти чёрный
-<meshStandardMaterial color="#111111" side={BackSide} />
+// Арена — тёмный пол
+<meshStandardMaterial color="#06060e" />
+
+// Стены — слабый зелёный glow
+<meshStandardMaterial color="#003322" emissive="#00ff88" emissiveIntensity={0.25} />
 ```
 
 ## Правила
 
 - Glow через `emissive` + `emissiveIntensity` на всех игровых объектах
 - Еда всегда ярче змейки
+- Голова ярче тела
 - Не использовать `MeshPhongMaterial` или текстуры с детализацией
-- Освещение — минимальное ambient + одна точка вдоль туннеля
+- Освещение — ambient + pointLight над ареной + слабый зелёный акцентный свет
+- Bloom постпроцессинг через `@react-three/postprocessing`

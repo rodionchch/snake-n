@@ -1,17 +1,13 @@
-import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import * as THREE from 'three'
 import { snakeRefs } from '../entities/snakeState'
 import { gridToWorldX, gridToWorldZ, lerp } from '../utils/math'
 import type { Direction } from '../entities/types'
 
-// Дистанция позади головы и высота камеры
-const BACK_DIST   = 11
-const CAM_HEIGHT  = 8
-const CAM_LERP    = 0.1   // плавность позиции
-const DIR_LERP    = 0.09  // плавность поворота при смене направления
+const BACK_DIST  = 11
+const CAM_HEIGHT = 8
+// Скорость плавного поворота камеры при смене направления (frame-rate independent)
+const DIR_SPEED  = 5
 
-// Вектор «назад» для каждого направления движения
 const BACK_VECTORS: Record<Direction, [number, number]> = {
   right: [-1,  0],
   left:  [ 1,  0],
@@ -19,45 +15,35 @@ const BACK_VECTORS: Record<Direction, [number, number]> = {
   up:    [ 0,  1],
 }
 
-// Сглаженный вектор «назад» — меняется плавно при повороте змейки
-const smoothBack = new THREE.Vector3(-1, 0, 0)
-const targetPos  = new THREE.Vector3()
-const lookTarget = new THREE.Vector3()
+// Сглаженный вектор «назад» — поворачивается плавно при повороте змейки
+let smoothBackX = -1
+let smoothBackZ =  0
 
 export function CameraSystem(): null {
-  const initialized = useRef(false)
-
-  useFrame(({ camera }) => {
+  useFrame(({ camera }, delta) => {
     const head     = snakeRefs.body[0]
     const prevHead = snakeRefs.prevBody[0]
     if (!head) return
 
-    // Интерполированная мировая позиция головы (для плавного движения)
+    // Интерполированная позиция головы — здесь вся плавность движения
     const t  = snakeRefs.tickProgress
     const hx = lerp(prevHead ? gridToWorldX(prevHead.x) : gridToWorldX(head.x), gridToWorldX(head.x), t)
     const hz = lerp(prevHead ? gridToWorldZ(prevHead.z) : gridToWorldZ(head.z), gridToWorldZ(head.z), t)
 
-    // Плавно поворачиваем вектор «назад» по направлению змейки
+    // Экспоненциальное сглаживание направления (не зависит от FPS)
     const [bx, bz] = BACK_VECTORS[snakeRefs.direction]
-    smoothBack.x = lerp(smoothBack.x, bx, DIR_LERP)
-    smoothBack.z = lerp(smoothBack.z, bz, DIR_LERP)
-    // Нормализуем, чтобы длина оставалась 1
-    const len = Math.sqrt(smoothBack.x ** 2 + smoothBack.z ** 2) || 1
-    const nx = smoothBack.x / len
-    const nz = smoothBack.z / len
+    const dirAlpha = 1 - Math.exp(-DIR_SPEED * delta)
+    smoothBackX = lerp(smoothBackX, bx, dirAlpha)
+    smoothBackZ = lerp(smoothBackZ, bz, dirAlpha)
 
-    targetPos.set(hx + nx * BACK_DIST, CAM_HEIGHT, hz + nz * BACK_DIST)
-    lookTarget.set(hx, 0.3, hz)
+    const len = Math.sqrt(smoothBackX ** 2 + smoothBackZ ** 2) || 1
+    const nx = smoothBackX / len
+    const nz = smoothBackZ / len
 
-    if (!initialized.current) {
-      camera.position.copy(targetPos)
-      camera.lookAt(lookTarget)
-      initialized.current = true
-      return
-    }
-
-    camera.position.lerp(targetPos, CAM_LERP)
-    camera.lookAt(lookTarget)
+    // Камера точно следит за головой — позиция без lerp (lerp только у направления)
+    // Это устраняет рассинхрон между позицией камеры и lookAt-целью
+    camera.position.set(hx + nx * BACK_DIST, CAM_HEIGHT, hz + nz * BACK_DIST)
+    camera.lookAt(hx, 0.3, hz)
   })
 
   return null
