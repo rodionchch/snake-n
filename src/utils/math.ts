@@ -34,5 +34,5 @@ export function randomGridPos(exclude: GridPos[] = []): GridPos {
 
 // Скорость растёт с очками: уменьшаем интервал между ходами
 export function getMoveInterval(score: number): number {
-  return Math.max(MOVE_INTERVAL_MIN, MOVE_INTERVAL_BASE - score * 0.002)
+  return Math.max(MOVE_INTERVAL_MIN, MOVE_INTERVAL_BASE - score * 0.0003)
 }

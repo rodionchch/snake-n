@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useGameStore } from '../store'
 import { resetSnakeRefs } from '../entities/snakeState'
+import { resetFlipRefs } from '../entities/flipState'
 
 const GREEN        = '#00ff88'
 const GREEN_DIM    = 'rgba(0,255,136,0.5)'
@@ -14,11 +15,13 @@ export function GameOverScreen() {
   const { startGame, restartGame } = useGameStore()
 
   function handleStart() {
+    resetFlipRefs()
     resetSnakeRefs()
     startGame()
   }
 
   function handleRestart() {
+    resetFlipRefs()
     resetSnakeRefs()
     restartGame()
   }

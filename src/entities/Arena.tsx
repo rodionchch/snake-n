@@ -1,22 +1,19 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
-import { GRID_WIDTH, GRID_HEIGHT, CELL_SIZE } from '../utils/constants'
+import { GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, BOARD_HALF_T } from '../utils/constants'
 import { gridToWorldX, gridToWorldZ } from '../utils/math'
 
-const W = GRID_WIDTH  * CELL_SIZE
-const H = GRID_HEIGHT * CELL_SIZE
-const WALL_H    = 1.2
-const WALL_T    = 0.4
-const TILE_SIZE = CELL_SIZE * 0.84  // зазор 0.16 → чёрные линии сетки
+const W         = GRID_WIDTH  * CELL_SIZE
+const H         = GRID_HEIGHT * CELL_SIZE
+const TILE_SIZE = CELL_SIZE * 0.84   // зазор 0.16 → чёрные линии сетки
 
-const NEON_MAGENTA = '#ff00cc'
-const NEON_YELLOW  = '#ffff00'
+const NEON_GREEN = '#00ff88'
+const EDGE_GLOW  = 0.9
 
 // Один меш — 400 плиток, вершинные цвета запечены в BufferGeometry
-function FloorTiles() {
+function FloorTiles({ yOffset }: { yOffset: number }) {
   const geometry = useMemo(() => {
     const hs    = TILE_SIZE / 2
-    const Y     = 0.005  // чуть выше пола
     const count = GRID_WIDTH * GRID_HEIGHT
     const positions = new Float32Array(count * 6 * 3)
     const colors    = new Float32Array(count * 6 * 3)
@@ -29,19 +26,18 @@ function FloorTiles() {
         const cx = gridToWorldX(x)
         const cz = gridToWorldZ(z)
 
-        // Диагональный градиент по HSL: красный → жёлтый → зелёный → циан → синий → маджента
+        // Диагональный градиент по HSL
         const t = (x / (GRID_WIDTH - 1) + z / (GRID_HEIGHT - 1)) / 2
         col.setHSL(t, 0.70, 0.22)
         const { r, g, b } = col
 
-        // Два треугольника = горизонтальный квадрат на плоскости Y
         const quad = [
-          cx - hs, Y, cz - hs,
-          cx + hs, Y, cz - hs,
-          cx + hs, Y, cz + hs,
-          cx - hs, Y, cz - hs,
-          cx + hs, Y, cz + hs,
-          cx - hs, Y, cz + hs,
+          cx - hs, yOffset, cz - hs,
+          cx + hs, yOffset, cz - hs,
+          cx + hs, yOffset, cz + hs,
+          cx - hs, yOffset, cz - hs,
+          cx + hs, yOffset, cz + hs,
+          cx - hs, yOffset, cz + hs,
         ]
         for (let v = 0; v < 6; v++) {
           positions[pi++] = quad[v * 3]
@@ -58,59 +54,54 @@ function FloorTiles() {
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     geo.setAttribute('color',    new THREE.BufferAttribute(colors,    3))
     return geo
-  }, [])
+  }, [yOffset])
 
   return (
     <mesh geometry={geometry}>
-      <meshBasicMaterial vertexColors side={THREE.DoubleSide} />
+      <meshBasicMaterial vertexColors side={THREE.BackSide} />
     </mesh>
   )
 }
 
+// Светящаяся полоска на краю доски (замена стенам)
+function EdgeStrip({ position, args }: {
+  position: [number, number, number]
+  args: [number, number, number]
+}) {
+  return (
+    <mesh position={position}>
+      <boxGeometry args={args} />
+      <meshStandardMaterial
+        color="#003322"
+        emissive={NEON_GREEN}
+        emissiveIntensity={EDGE_GLOW}
+      />
+    </mesh>
+  )
+}
+
+const STRIP_H = BOARD_HALF_T * 2 + 0.04  // чуть выше толщины доски
+const STRIP_T = 0.10                      // толщина полоски
+
 export function Arena() {
+  const topY = BOARD_HALF_T + 0.005
+
   return (
     <group>
-      {/* Чёрный пол — просвечивает в зазорах между плитками */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <planeGeometry args={[W, H]} />
-        <meshStandardMaterial color="#000000" />
+      {/* Сама доска — тонкая коробка, видна при перевороте как ребро */}
+      <mesh>
+        <boxGeometry args={[W, BOARD_HALF_T * 2, H]} />
+        <meshStandardMaterial color="#02020a" />
       </mesh>
 
-      <FloorTiles />
+      {/* Тайлы игровой поверхности */}
+      <FloorTiles yOffset={topY} />
 
-      {/* Стены — неоновый маджента */}
-      <mesh position={[0, WALL_H / 2, -H / 2 - WALL_T / 2]}>
-        <boxGeometry args={[W + WALL_T * 2, WALL_H, WALL_T]} />
-        <meshStandardMaterial color="#220033" emissive={NEON_MAGENTA} emissiveIntensity={0.5} />
-      </mesh>
-
-      <mesh position={[0, WALL_H / 2, H / 2 + WALL_T / 2]}>
-        <boxGeometry args={[W + WALL_T * 2, WALL_H, WALL_T]} />
-        <meshStandardMaterial color="#220033" emissive={NEON_MAGENTA} emissiveIntensity={0.5} />
-      </mesh>
-
-      <mesh position={[-W / 2 - WALL_T / 2, WALL_H / 2, 0]}>
-        <boxGeometry args={[WALL_T, WALL_H, H]} />
-        <meshStandardMaterial color="#220033" emissive={NEON_MAGENTA} emissiveIntensity={0.5} />
-      </mesh>
-
-      <mesh position={[W / 2 + WALL_T / 2, WALL_H / 2, 0]}>
-        <boxGeometry args={[WALL_T, WALL_H, H]} />
-        <meshStandardMaterial color="#220033" emissive={NEON_MAGENTA} emissiveIntensity={0.5} />
-      </mesh>
-
-      {/* Угловые столбики — неоновый жёлтый */}
-      {([
-        [-W / 2 - WALL_T / 2,  H / 2 + WALL_T / 2],
-        [ W / 2 + WALL_T / 2,  H / 2 + WALL_T / 2],
-        [-W / 2 - WALL_T / 2, -H / 2 - WALL_T / 2],
-        [ W / 2 + WALL_T / 2, -H / 2 - WALL_T / 2],
-      ] as [number, number][]).map(([x, z], i) => (
-        <mesh key={i} position={[x, WALL_H / 2, z]}>
-          <boxGeometry args={[WALL_T, WALL_H, WALL_T]} />
-          <meshStandardMaterial color="#222200" emissive={NEON_YELLOW} emissiveIntensity={0.9} />
-        </mesh>
-      ))}
+      {/* Светящиеся края — обозначают границу, куда можно «упасть» */}
+      <EdgeStrip position={[0,      0, -H / 2]} args={[W + STRIP_T, STRIP_H, STRIP_T]} />
+      <EdgeStrip position={[0,      0,  H / 2]} args={[W + STRIP_T, STRIP_H, STRIP_T]} />
+      <EdgeStrip position={[-W / 2, 0,      0]} args={[STRIP_T, STRIP_H, H + STRIP_T]} />
+      <EdgeStrip position={[ W / 2, 0,      0]} args={[STRIP_T, STRIP_H, H + STRIP_T]} />
     </group>
   )
 }

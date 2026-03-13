@@ -1,10 +1,14 @@
+import { useEffect, useRef } from 'react'
+import * as THREE from 'three'
 import { Canvas } from '@react-three/fiber'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { GameLoop } from '../engine/GameLoop'
 import { CameraSystem } from '../systems/CameraSystem'
+import { FlipSystem } from '../systems/FlipSystem'
 import { Snake } from '../entities/Snake'
 import { Food } from '../entities/Food'
 import { Arena } from '../entities/Arena'
+import { flipGroupRef } from '../entities/flipState'
 
 function Lights() {
   return (
@@ -16,6 +20,18 @@ function Lights() {
   )
 }
 
+// Компонент-мост: подключает R3F group ref к мутабельному flipGroupRef
+function FlipGroup({ children }: { children: React.ReactNode }) {
+  const ref = useRef<THREE.Group>(null)
+
+  useEffect(() => {
+    flipGroupRef.current = ref.current
+    return () => { flipGroupRef.current = null }
+  }, [])
+
+  return <group ref={ref}>{children}</group>
+}
+
 export function GameCanvas() {
   return (
     <Canvas
@@ -24,13 +40,21 @@ export function GameCanvas() {
       style={{ width: '100vw', height: '100vh', background: '#000000' }}
     >
       <Lights />
-      <Arena />
-      <Snake />
-      <Food />
+
+      {/* Вся сцена внутри FlipGroup — переворачивается как единое целое */}
+      <FlipGroup>
+        <Arena />
+        <Snake />
+        <Food />
+      </FlipGroup>
+
+      {/* Системы вне группы — они сами читают flipGroupRef для мировых координат */}
       <GameLoop />
+      <FlipSystem />
       <CameraSystem />
+
       <EffectComposer>
-        <Bloom threshold={0.05} strength={1.0} radius={0.8} />
+        <Bloom threshold={0.4} strength={0.9} radius={0.4} />
       </EffectComposer>
     </Canvas>
   )

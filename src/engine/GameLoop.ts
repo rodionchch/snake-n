@@ -2,10 +2,12 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '../store'
 import { snakeRefs } from '../entities/snakeState'
+import { flipRefs } from '../entities/flipState'
 import { inputState } from './InputSystem'
-import { checkWallCollision, checkSelfCollision } from '../systems/CollisionSystem'
+import { checkSelfCollision } from '../systems/CollisionSystem'
 import { spawnFoodPosition, hasEatenFood } from '../systems/FoodSpawnSystem'
 import { getMoveInterval } from '../utils/math'
+import { GRID_WIDTH, GRID_HEIGHT } from '../utils/constants'
 import type { Direction, GridPos } from '../entities/types'
 
 // Поворот CCW (от игрока — «налево»): right→up→left→down→right
@@ -24,7 +26,7 @@ const TURN_RIGHT: Record<Direction, Direction> = {
   up:    'right',
 }
 
-function nextHead(body: GridPos[], dir: Direction): GridPos {
+function calcNextHead(body: GridPos[], dir: Direction): GridPos {
   const { x, z } = body[0]
   switch (dir) {
     case 'up':    return { x,     z: z - 1 }
@@ -32,6 +34,23 @@ function nextHead(body: GridPos[], dir: Direction): GridPos {
     case 'left':  return { x: x - 1, z }
     case 'right': return { x: x + 1, z }
   }
+}
+
+interface WrapResult {
+  wrapped: GridPos
+  axis: 'x' | 'z'
+  sign: 1 | -1
+}
+
+// Если голова вышла за пределы — возвращает обёрнутую позицию + параметры флипа
+function tryWrapEdge(pos: GridPos): WrapResult | null {
+  const { x, z } = pos
+  // Доска катится в направлении выхода
+  if (x >= GRID_WIDTH)  return { wrapped: { x: 0,              z }, axis: 'z', sign: -1 }
+  if (x < 0)            return { wrapped: { x: GRID_WIDTH - 1, z }, axis: 'z', sign:  1 }
+  if (z >= GRID_HEIGHT) return { wrapped: { x, z: 0               }, axis: 'x', sign:  1 }
+  if (z < 0)            return { wrapped: { x, z: GRID_HEIGHT - 1  }, axis: 'x', sign: -1 }
+  return null
 }
 
 export function GameLoop(): null {
@@ -59,32 +78,40 @@ export function GameLoop(): null {
         if (turn === 'right') snakeRefs.direction = TURN_RIGHT[snakeRefs.direction]
         inputState.turn = null
 
-        const head = nextHead(snakeRefs.body, snakeRefs.direction)
+        let head = calcNextHead(snakeRefs.body, snakeRefs.direction)
 
-        if (checkWallCollision(head)) {
+        // Проверяем выход за границу — оборачиваем и запускаем flip
+        const wrap = tryWrapEdge(head)
+        if (wrap) {
+          head = wrap.wrapped
+          // Новый флип запускается только если предыдущий завершён
+          if (!flipRefs.isFlipping) {
+            flipRefs.startRotX    = flipRefs.rotX
+            flipRefs.startRotZ    = flipRefs.rotZ
+            flipRefs.flipAxis     = wrap.axis
+            flipRefs.flipSign     = wrap.sign
+            flipRefs.flipProgress = 0
+            flipRefs.isFlipping   = true
+          }
+        }
+
+        snakeRefs.prevBody = snakeRefs.body.map(p => ({ ...p }))
+        snakeRefs.body.unshift(head)
+
+        if (checkSelfCollision(snakeRefs.body)) {
           endGame()
         } else {
-          snakeRefs.prevBody = snakeRefs.body.map(p => ({ ...p }))
-          snakeRefs.body.unshift(head)
-
-          if (checkSelfCollision(snakeRefs.body)) {
-            endGame()
-          } else {
-            if (hasEatenFood(head, food.position)) {
-              const tail = snakeRefs.body[snakeRefs.body.length - 1]
-              for (let i = 0; i < 3; i++) snakeRefs.body.push({ ...tail })
-              incrementScore(10)
-              growSnake(3)
-              setFood({ position: spawnFoodPosition(snakeRefs.body), active: true })
-            }
-            snakeRefs.body.pop()
+          if (hasEatenFood(head, food.position)) {
+            snakeRefs.body.push({ ...snakeRefs.body[snakeRefs.body.length - 1] })
+            incrementScore(10)
+            growSnake(1)
+            setFood({ position: spawnFoodPosition(snakeRefs.body), active: true })
           }
+          snakeRefs.body.pop()
         }
       }
     }
 
-    // tickProgress обновляется ПОСЛЕ тика — остаток времени учитывается,
-    // нет резкого скачка к 0 между кадрами
     snakeRefs.tickProgress = Math.min(accRef.current / interval, 1)
   })
 

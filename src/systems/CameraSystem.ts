@@ -1,6 +1,9 @@
 import { useFrame } from '@react-three/fiber'
+import * as THREE from 'three'
 import { snakeRefs } from '../entities/snakeState'
+import { flipGroupRef } from '../entities/flipState'
 import { gridToWorldX, gridToWorldZ, lerp } from '../utils/math'
+import { SNAKE_HEAD_R } from '../utils/constants'
 import type { Direction } from '../entities/types'
 
 const BACK_DIST  = 11
@@ -15,9 +18,14 @@ const BACK_VECTORS: Record<Direction, [number, number]> = {
   up:    [ 0,  1],
 }
 
-// Сглаженный вектор «назад» — поворачивается плавно при повороте змейки
+// Сглаженный вектор «назад» в локальном пространстве группы
 let smoothBackX = -1
 let smoothBackZ =  0
+
+// Переиспользуемые объекты — не создавать в useFrame
+const _localHead = new THREE.Vector3()
+const _backDir   = new THREE.Vector3()
+const _worldUp   = new THREE.Vector3()
 
 export function CameraSystem(): null {
   useFrame(({ camera }, delta) => {
@@ -25,25 +33,52 @@ export function CameraSystem(): null {
     const prevHead = snakeRefs.prevBody[0]
     if (!head) return
 
-    // Интерполированная позиция головы — здесь вся плавность движения
-    const t  = snakeRefs.tickProgress
-    const hx = lerp(prevHead ? gridToWorldX(prevHead.x) : gridToWorldX(head.x), gridToWorldX(head.x), t)
-    const hz = lerp(prevHead ? gridToWorldZ(prevHead.z) : gridToWorldZ(head.z), gridToWorldZ(head.z), t)
+    const group = flipGroupRef.current
+    if (!group) return
 
-    // Экспоненциальное сглаживание направления (не зависит от FPS)
+    // Интерполированная позиция головы — обрабатываем телепорт при wrap
+    const t   = snakeRefs.tickProgress
+    const wrappedX = prevHead && Math.abs(prevHead.x - head.x) > 1
+    const wrappedZ = prevHead && Math.abs(prevHead.z - head.z) > 1
+    const lhx = wrappedX
+      ? gridToWorldX(head.x)
+      : lerp(prevHead ? gridToWorldX(prevHead.x) : gridToWorldX(head.x), gridToWorldX(head.x), t)
+    const lhz = wrappedZ
+      ? gridToWorldZ(head.z)
+      : lerp(prevHead ? gridToWorldZ(prevHead.z) : gridToWorldZ(head.z), gridToWorldZ(head.z), t)
+
+    // Змейка всегда на верхней грани в локальном пространстве
+    _localHead.set(lhx, SNAKE_HEAD_R, lhz)
+
+    // Переводим позицию головы из локального в мировое пространство
+    group.localToWorld(_localHead)
+
+    // Плавно сглаживаем вектор «назад» в локальном пространстве
     const [bx, bz] = BACK_VECTORS[snakeRefs.direction]
     const dirAlpha = 1 - Math.exp(-DIR_SPEED * delta)
     smoothBackX = lerp(smoothBackX, bx, dirAlpha)
     smoothBackZ = lerp(smoothBackZ, bz, dirAlpha)
 
     const len = Math.sqrt(smoothBackX ** 2 + smoothBackZ ** 2) || 1
-    const nx = smoothBackX / len
-    const nz = smoothBackZ / len
 
-    // Камера точно следит за головой — позиция без lerp (lerp только у направления)
-    // Это устраняет рассинхрон между позицией камеры и lookAt-целью
-    camera.position.set(hx + nx * BACK_DIST, CAM_HEIGHT, hz + nz * BACK_DIST)
-    camera.lookAt(hx, 0.3, hz)
+    // Вектор «назад» из локального → мирового пространства (только поворот, без сдвига)
+    _backDir.set(smoothBackX / len, 0, smoothBackZ / len)
+    _backDir.transformDirection(group.matrixWorld)
+
+    // «Вверх» камеры = локальная ось Y в мировом пространстве.
+    // Это ключ к правильной ориентации камеры при перевороте доски.
+    _worldUp.set(0, 1, 0)
+    _worldUp.transformDirection(group.matrixWorld)
+
+    camera.position.set(
+      _localHead.x + _backDir.x * BACK_DIST + _worldUp.x * CAM_HEIGHT,
+      _localHead.y + _backDir.y * BACK_DIST + _worldUp.y * CAM_HEIGHT,
+      _localHead.z + _backDir.z * BACK_DIST + _worldUp.z * CAM_HEIGHT,
+    )
+
+    // Обновляем up-вектор ПЕРЕД lookAt — иначе камера может перевернуться
+    camera.up.copy(_worldUp)
+    camera.lookAt(_localHead.x, _localHead.y, _localHead.z)
   })
 
   return null
