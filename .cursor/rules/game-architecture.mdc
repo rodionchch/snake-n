@@ -1,0 +1,28 @@
+---
+description: Game architecture rules for Snake N-Gage (React + TypeScript + Vite)
+alwaysApply: true
+---
+
+# Game Architecture Rules
+
+Проект — браузерная 3D игра Snake N-Gage в React + TypeScript + Vite.
+
+## Структура проекта
+
+```
+src/
+  engine/       # игровой цикл, системы, input, collision
+  entities/     # сущности: Snake, Food, Tunnel
+  systems/      # логика движения, коллизий, spawn еды, камеры
+  components/   # рендер и UI: Canvas, HUD, GameOver
+  store/        # Zustand состояние игры
+  utils/        # вспомогательные функции, math, random
+```
+
+## Правила
+
+- **Entities** = игровые объекты (данные и состояние)
+- **Systems** = логика обновления (чистые функции над entities)
+- Rendering отдельно от логики — компоненты только читают состояние
+- Game updates выполняются в `useFrame()`
+- Не помещать игровую логику в React компоненты

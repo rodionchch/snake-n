@@ -1,0 +1,32 @@
+---
+description: Visual style rules — minimalist arcade aesthetic for Snake N-Gage
+alwaysApply: true
+---
+
+# Visual Style Rules
+
+## Общий стиль
+
+- Минимализм в духе Snake N-Gage (Nokia, начало 2000-х)
+- Аркадная эстетика — никакого фотореализма
+- Тёмный фон туннеля, яркие игровые объекты
+
+## Материалы
+
+```tsx
+// Змейка — яркий emissive цвет
+<meshStandardMaterial color="#00ff88" emissive="#00ff88" emissiveIntensity={0.8} />
+
+// Еда — светящийся объект
+<meshStandardMaterial color="#ff4400" emissive="#ff4400" emissiveIntensity={1.2} />
+
+// Туннель — тёмный, почти чёрный
+<meshStandardMaterial color="#111111" side={BackSide} />
+```
+
+## Правила
+
+- Glow через `emissive` + `emissiveIntensity` на всех игровых объектах
+- Еда всегда ярче змейки
+- Не использовать `MeshPhongMaterial` или текстуры с детализацией
+- Освещение — минимальное ambient + одна точка вдоль туннеля

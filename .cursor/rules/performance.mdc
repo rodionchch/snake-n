@@ -1,0 +1,37 @@
+---
+description: Performance rules for 60-120 FPS rendering in Snake N-Gage
+alwaysApply: true
+---
+
+# Performance Rules
+
+## Рендеринг
+
+- Использовать `InstancedMesh` для сегментов змейки — один draw call на все сегменты
+- Трансформы объектов обновлять только внутри `useFrame`, не через state
+
+```tsx
+// ❌ BAD — вызывает re-render на каждый кадр
+const [pos, setPos] = useState(new Vector3());
+useFrame(() => setPos(newPos));
+
+// ✅ GOOD — без re-render
+const meshRef = useRef<InstancedMesh>(null);
+useFrame(() => {
+  dummy.position.set(x, y, z);
+  dummy.updateMatrix();
+  meshRef.current!.setMatrixAt(i, dummy.matrix);
+  meshRef.current!.instanceMatrix.needsUpdate = true;
+});
+```
+
+## React State
+
+- Не хранить per-frame данные в React state
+- Refs — для 3D-объектов, позиций, истории движения
+- Zustand state — только для смены экранов, счёта, game over
+
+## Цель
+
+- 60–120 FPS стабильно
+- Минимум React re-renders за игровую сессию

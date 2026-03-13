@@ -1,0 +1,37 @@
+---
+description: Snake movement mechanics inside a cylindrical tunnel
+alwaysApply: true
+---
+
+# Snake Mechanics Rules
+
+## Движение
+
+Змейка движется по внутренней поверхности цилиндрического туннеля:
+- Только вперёд + вращение вокруг оси туннеля
+- Игрок управляет углом `angle`, `z` увеличивается автоматически
+
+## Цилиндрические координаты
+
+```ts
+x = radius * Math.cos(angle)
+y = radius * Math.sin(angle)
+z += speed * delta
+```
+
+## Сегменты тела
+
+Тело повторяет траекторию головы через `positionHistory`:
+
+```ts
+// Голова пишет в историю каждый кадр
+positionHistory.unshift({ angle, z });
+
+// Каждый сегмент берёт позицию из истории
+segment[i].position = positionHistory[i * SEGMENT_SPACING];
+```
+
+## Камера
+
+- Располагается позади головы
+- Слегка вращается вокруг оси туннеля вслед за `angle` головы
