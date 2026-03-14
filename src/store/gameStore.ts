@@ -18,13 +18,15 @@ interface GameState {
   score: number
   snake: SnakeState
   food: FoodState
+  obstacles: GridPos[]
 
-  startGame:     () => void
-  restartGame:   () => void
-  endGame:       () => void
+  startGame:      () => void
+  restartGame:    () => void
+  endGame:        () => void
   incrementScore: (points: number) => void
-  growSnake:     (count: number) => void
-  setFood:       (food: FoodState) => void
+  growSnake:      (count: number) => void
+  setFood:        (food: FoodState) => void
+  setObstacles:   (obstacles: GridPos[]) => void
 }
 
 const initialSnake: SnakeState = { length: 3 }
@@ -35,10 +37,11 @@ const initialFood: FoodState = {
 }
 
 export const useGameStore = create<GameState>((set) => ({
-  status: 'idle',
-  score:  0,
-  snake:  initialSnake,
-  food:   initialFood,
+  status:    'idle',
+  score:     0,
+  snake:     initialSnake,
+  food:      initialFood,
+  obstacles: [],
 
   startGame: () =>
     set({ status: 'running', score: 0, snake: { length: 3 }, food: { ...initialFood, active: false } }),
@@ -52,5 +55,6 @@ export const useGameStore = create<GameState>((set) => ({
 
   growSnake: (count) => set(s => ({ snake: { length: s.snake.length + count } })),
 
-  setFood: (food) => set({ food }),
+  setFood:      (food)      => set({ food }),
+  setObstacles: (obstacles) => set({ obstacles }),
 }))

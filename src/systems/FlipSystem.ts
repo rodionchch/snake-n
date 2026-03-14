@@ -2,9 +2,9 @@ import { useFrame } from '@react-three/fiber'
 import { flipRefs, flipGroupRef } from '../entities/flipState'
 import { lerp } from '../utils/math'
 
-const FLIP_DURATION = 0.65  // секунды на один переворот
+const FLIP_DURATION = 0.6  // секунды на переворот 180°
+const TWO_PI = Math.PI * 2
 
-// Кубический ease-in-out: медленно → быстро → медленно
 function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 }
@@ -25,10 +25,13 @@ export function FlipSystem(): null {
     group.rotation.z = lerp(flipRefs.startRotZ, targetRotZ, eased)
 
     if (flipRefs.flipProgress >= 1) {
-      flipRefs.rotX       = targetRotX
-      flipRefs.rotZ       = targetRotZ
+      // Нормализуем в [0, 2π) чтобы числа не росли бесконечно
+      flipRefs.rotX = ((targetRotX % TWO_PI) + TWO_PI) % TWO_PI
+      flipRefs.rotZ = ((targetRotZ % TWO_PI) + TWO_PI) % TWO_PI
+      group.rotation.x = flipRefs.rotX
+      group.rotation.z = flipRefs.rotZ
       flipRefs.isFlipping = false
-      flipRefs.flipCount += 1   // счётчик завершённых переворотов
+      flipRefs.flipCount += 1
     }
   })
 

@@ -1,7 +1,8 @@
 import { useEffect } from 'react'
 import { useGameStore } from '../store'
-import { resetSnakeRefs } from '../entities/snakeState'
+import { resetSnakeRefs, snakeRefs } from '../entities/snakeState'
 import { resetFlipRefs } from '../entities/flipState'
+import { generateObstacles } from '../systems/ObstacleSystem'
 
 const GREEN        = '#00ff88'
 const GREEN_DIM    = 'rgba(0,255,136,0.5)'
@@ -12,17 +13,19 @@ export function GameOverScreen() {
   const status = useGameStore(s => s.status)
   const score  = useGameStore(s => s.score)
   const length = useGameStore(s => s.snake.length)
-  const { startGame, restartGame } = useGameStore()
+  const { startGame, restartGame, setObstacles } = useGameStore()
 
   function handleStart() {
     resetFlipRefs()
     resetSnakeRefs()
+    setObstacles(generateObstacles(snakeRefs.body))
     startGame()
   }
 
   function handleRestart() {
     resetFlipRefs()
     resetSnakeRefs()
+    setObstacles(generateObstacles(snakeRefs.body))
     restartGame()
   }
 

@@ -1,7 +1,9 @@
-import { useMemo } from 'react'
+import { useRef, useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { GRID_WIDTH, GRID_HEIGHT, CELL_SIZE, BOARD_HALF_T } from '../utils/constants'
 import { gridToWorldX, gridToWorldZ } from '../utils/math'
+import { flipRefs } from './flipState'
 
 const W         = GRID_WIDTH  * CELL_SIZE
 const H         = GRID_HEIGHT * CELL_SIZE
@@ -63,25 +65,50 @@ function FloorTiles({ yOffset }: { yOffset: number }) {
   )
 }
 
-// Светящаяся полоска на краю доски (замена стенам)
-function EdgeStrip({ position, args }: {
-  position: [number, number, number]
-  args: [number, number, number]
-}) {
-  return (
-    <mesh position={position}>
-      <boxGeometry args={args} />
-      <meshStandardMaterial
-        color="#003322"
-        emissive={NEON_GREEN}
-        emissiveIntensity={EDGE_GLOW}
-      />
-    </mesh>
-  )
-}
-
 const STRIP_H = BOARD_HALF_T * 2 + 0.04  // чуть выше толщины доски
 const STRIP_T = 0.10                      // толщина полоски
+
+const STRIP_DEFS: { position: [number, number, number]; args: [number, number, number] }[] = [
+  { position: [0,      0, -H / 2], args: [W + STRIP_T, STRIP_H, STRIP_T] },
+  { position: [0,      0,  H / 2], args: [W + STRIP_T, STRIP_H, STRIP_T] },
+  { position: [-W / 2, 0,      0], args: [STRIP_T, STRIP_H, H + STRIP_T] },
+  { position: [ W / 2, 0,      0], args: [STRIP_T, STRIP_H, H + STRIP_T] },
+]
+
+// Все 4 края — один компонент с useFrame для пульса во время флипа
+function EdgeStrips() {
+  const r0 = useRef<THREE.MeshStandardMaterial>(null)
+  const r1 = useRef<THREE.MeshStandardMaterial>(null)
+  const r2 = useRef<THREE.MeshStandardMaterial>(null)
+  const r3 = useRef<THREE.MeshStandardMaterial>(null)
+  const matRefs = [r0, r1, r2, r3]
+
+  useFrame(() => {
+    // Bell-curve: максимум в середине переворота (progress=0.5)
+    const pulse = flipRefs.isFlipping
+      ? EDGE_GLOW + 3.5 * Math.sin(flipRefs.flipProgress * Math.PI)
+      : EDGE_GLOW
+    for (const r of matRefs) {
+      if (r.current) r.current.emissiveIntensity = pulse
+    }
+  })
+
+  return (
+    <>
+      {STRIP_DEFS.map((s, i) => (
+        <mesh key={i} position={s.position}>
+          <boxGeometry args={s.args} />
+          <meshStandardMaterial
+            ref={matRefs[i]}
+            color="#003322"
+            emissive={NEON_GREEN}
+            emissiveIntensity={EDGE_GLOW}
+          />
+        </mesh>
+      ))}
+    </>
+  )
+}
 
 export function Arena() {
   const topY = BOARD_HALF_T + 0.005
@@ -98,10 +125,7 @@ export function Arena() {
       <FloorTiles yOffset={topY} />
 
       {/* Светящиеся края — обозначают границу, куда можно «упасть» */}
-      <EdgeStrip position={[0,      0, -H / 2]} args={[W + STRIP_T, STRIP_H, STRIP_T]} />
-      <EdgeStrip position={[0,      0,  H / 2]} args={[W + STRIP_T, STRIP_H, STRIP_T]} />
-      <EdgeStrip position={[-W / 2, 0,      0]} args={[STRIP_T, STRIP_H, H + STRIP_T]} />
-      <EdgeStrip position={[ W / 2, 0,      0]} args={[STRIP_T, STRIP_H, H + STRIP_T]} />
+      <EdgeStrips />
     </group>
   )
 }

@@ -6,10 +6,10 @@ import { gridToWorldX, gridToWorldZ, lerp } from '../utils/math'
 import { SNAKE_HEAD_R } from '../utils/constants'
 import type { Direction } from '../entities/types'
 
-const BACK_DIST  = 11
+const BACK_DIST = 11
 const CAM_HEIGHT = 8
 // Скорость плавного поворота камеры при смене направления (frame-rate independent)
-const DIR_SPEED  = 5
+const DIR_SPEED = 5
 
 const BACK_VECTORS: Record<Direction, [number, number]> = {
   right: [-1,  0],
@@ -18,7 +18,6 @@ const BACK_VECTORS: Record<Direction, [number, number]> = {
   up:    [ 0,  1],
 }
 
-// Сглаженный вектор «назад» в локальном пространстве группы
 let smoothBackX = -1
 let smoothBackZ =  0
 
@@ -36,8 +35,8 @@ export function CameraSystem(): null {
     const group = flipGroupRef.current
     if (!group) return
 
-    // Интерполированная позиция головы — обрабатываем телепорт при wrap
-    const t   = snakeRefs.tickProgress
+    // Интерполированная позиция головы в локальном пространстве группы
+    const t = snakeRefs.tickProgress
     const wrappedX = prevHead && Math.abs(prevHead.x - head.x) > 1
     const wrappedZ = prevHead && Math.abs(prevHead.z - head.z) > 1
     const lhx = wrappedX
@@ -49,24 +48,22 @@ export function CameraSystem(): null {
 
     // Змейка всегда на верхней грани в локальном пространстве
     _localHead.set(lhx, SNAKE_HEAD_R, lhz)
-
-    // Переводим позицию головы из локального в мировое пространство
+    // Переводим в мировые координаты (учитывает текущий поворот доски)
     group.localToWorld(_localHead)
 
-    // Плавно сглаживаем вектор «назад» в локальном пространстве
+    // Плавный вектор «назад» в локальном пространстве
     const [bx, bz] = BACK_VECTORS[snakeRefs.direction]
     const dirAlpha = 1 - Math.exp(-DIR_SPEED * delta)
     smoothBackX = lerp(smoothBackX, bx, dirAlpha)
     smoothBackZ = lerp(smoothBackZ, bz, dirAlpha)
-
     const len = Math.sqrt(smoothBackX ** 2 + smoothBackZ ** 2) || 1
 
-    // Вектор «назад» из локального → мирового пространства (только поворот, без сдвига)
+    // Вектор «назад» и «вверх» из локального → мирового пространства
     _backDir.set(smoothBackX / len, 0, smoothBackZ / len)
     _backDir.transformDirection(group.matrixWorld)
 
     // «Вверх» камеры = локальная ось Y в мировом пространстве.
-    // Это ключ к правильной ориентации камеры при перевороте доски.
+    // Именно это заставляет камеру корректно переходить на другую сторону при флипе.
     _worldUp.set(0, 1, 0)
     _worldUp.transformDirection(group.matrixWorld)
 
@@ -76,7 +73,7 @@ export function CameraSystem(): null {
       _localHead.z + _backDir.z * BACK_DIST + _worldUp.z * CAM_HEIGHT,
     )
 
-    // Обновляем up-вектор ПЕРЕД lookAt — иначе камера может перевернуться
+    // up устанавливается ДО lookAt — иначе камера может перевернуться
     camera.up.copy(_worldUp)
     camera.lookAt(_localHead.x, _localHead.y, _localHead.z)
   })

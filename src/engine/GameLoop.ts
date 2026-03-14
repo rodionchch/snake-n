@@ -4,7 +4,7 @@ import { useGameStore } from '../store'
 import { snakeRefs } from '../entities/snakeState'
 import { flipRefs } from '../entities/flipState'
 import { inputState } from './InputSystem'
-import { checkSelfCollision } from '../systems/CollisionSystem'
+import { checkSelfCollision, checkObstacleCollision } from '../systems/CollisionSystem'
 import { spawnFoodPosition, hasEatenFood } from '../systems/FoodSpawnSystem'
 import { getMoveInterval } from '../utils/math'
 import { GRID_WIDTH, GRID_HEIGHT } from '../utils/constants'
@@ -57,7 +57,7 @@ export function GameLoop(): null {
   const accRef = useRef(0)
 
   useFrame((_, delta) => {
-    const { status, score, food, incrementScore, growSnake, setFood, endGame } =
+    const { status, score, food, obstacles, incrementScore, growSnake, setFood, endGame } =
       useGameStore.getState()
 
     if (status !== 'running') return
@@ -70,7 +70,7 @@ export function GameLoop(): null {
       accRef.current -= interval
 
       if (!food.active) {
-        setFood({ position: spawnFoodPosition(snakeRefs.body), active: true })
+        setFood({ position: spawnFoodPosition(snakeRefs.body, obstacles), active: true })
       } else {
         // Применяем накопленный поворот
         const turn = inputState.turn
@@ -98,14 +98,14 @@ export function GameLoop(): null {
         snakeRefs.prevBody = snakeRefs.body.map(p => ({ ...p }))
         snakeRefs.body.unshift(head)
 
-        if (checkSelfCollision(snakeRefs.body)) {
+        if (checkSelfCollision(snakeRefs.body) || checkObstacleCollision(head, obstacles)) {
           endGame()
         } else {
           if (hasEatenFood(head, food.position)) {
             snakeRefs.body.push({ ...snakeRefs.body[snakeRefs.body.length - 1] })
             incrementScore(10)
             growSnake(1)
-            setFood({ position: spawnFoodPosition(snakeRefs.body), active: true })
+            setFood({ position: spawnFoodPosition(snakeRefs.body, obstacles), active: true })
           }
           snakeRefs.body.pop()
         }

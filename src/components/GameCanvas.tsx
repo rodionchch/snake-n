@@ -8,6 +8,7 @@ import { FlipSystem } from '../systems/FlipSystem'
 import { Snake } from '../entities/Snake'
 import { Food } from '../entities/Food'
 import { Arena } from '../entities/Arena'
+import { Obstacles } from '../entities/Obstacles'
 import { flipGroupRef } from '../entities/flipState'
 
 function Lights() {
@@ -44,6 +45,7 @@ export function GameCanvas() {
       {/* Вся сцена внутри FlipGroup — переворачивается как единое целое */}
       <FlipGroup>
         <Arena />
+        <Obstacles />
         <Snake />
         <Food />
       </FlipGroup>

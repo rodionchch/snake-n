@@ -2,10 +2,10 @@ import type { GridPos } from '../entities/types'
 import { randomGridPos } from '../utils/math'
 import { flipRefs } from '../entities/flipState'
 
-export function spawnFoodPosition(snakeBody: GridPos[]): GridPos {
+export function spawnFoodPosition(snakeBody: GridPos[], obstacles: GridPos[] = []): GridPos {
   // Рандомно: сторона 0 (текущая) или 1 (другая, потребует переворот)
   flipRefs.foodSide = Math.random() < 0.5 ? 0 : 1
-  return randomGridPos(snakeBody)
+  return randomGridPos([...snakeBody, ...obstacles])
 }
 
 export function hasEatenFood(head: GridPos, foodPos: GridPos): boolean {

@@ -11,3 +11,7 @@ export function checkSelfCollision(body: GridPos[]): boolean {
   const { x, z } = body[0]
   return body.slice(3).some(seg => seg.x === x && seg.z === z)
 }
+
+export function checkObstacleCollision(head: GridPos, obstacles: GridPos[]): boolean {
+  return obstacles.some(o => o.x === head.x && o.z === head.z)
+}
